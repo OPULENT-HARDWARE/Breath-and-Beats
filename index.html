@@ -42,7 +42,7 @@
     text-align:center;
   }
 
-  .label{font-size:clamp(14px,2vw,18px);color:var(--muted);margin-top:6px;}
+  .label{font-size:clamp(14px,2vw,18px);color:var(--muted);margin-top:6px;transition:opacity 0.5s;}
   .legend{position:absolute;bottom:14px;left:16px;font-size:12px;color:var(--muted);opacity:.9;}
 
   .controls{
@@ -67,6 +67,12 @@
     --progress:#00ff8a;
     --muted:#ffffff;
   }
+
+  #status{
+    font-size:clamp(16px,3vw,26px);
+    font-weight:500;
+    transition:opacity 0.8s ease;
+  }
 </style>
 </head>
 <body>
@@ -89,12 +95,12 @@
 
       <div class="center-text">
         <div>
-          <div id="status" style="font-size:clamp(16px,3vw,26px);font-weight:500;">∞</div>
+          <div id="status">∞</div>
           <div class="label" id="modeLabel">—</div>
         </div>
       </div>
 
-      <div class="legend">press <kbd>H</kbd> for high-contrast</div>
+      <div class="legend">press <kbd>H</kbd> for high-contrast • <kbd>R</kbd> for rest</div>
     </div>
 
     <div class="controls">
@@ -119,37 +125,52 @@
   let bpm=60;
   let mode='breath';
   let start=performance.now();
+  let resting=false;
 
   bpmInput.addEventListener('input',()=>bpm=parseFloat(bpmInput.value)||60);
   modeSelect.addEventListener('change',()=>mode=modeSelect.value);
 
   document.addEventListener('keydown',e=>{
-    if(e.key.toLowerCase()==='h')document.body.classList.toggle('high-contrast');
+    const k=e.key.toLowerCase();
+    if(k==='h') document.body.classList.toggle('high-contrast');
+    if(k==='r'){ resting=!resting; if(resting){ enterRest(); } else { exitRest(); } }
   });
 
+  function enterRest(){
+    resting=true;
+    pulse.setAttribute('transform','scale(1)');
+    pulse.setAttribute('stroke-opacity','0.3');
+    modeLabel.textContent='stillness';
+    status.style.opacity=0; // fade out BPM
+  }
+
+  function exitRest(){
+    resting=false;
+    status.style.opacity=1;
+  }
+
   function animate(t){
-    const elapsed=(t-start)/1000;
-    const beatDuration=60/bpm;
+    if(!resting){
+      const elapsed=(t-start)/1000;
+      const beatDuration=60/bpm;
+      const phase=(elapsed%beatDuration)/beatDuration; // 0→1
 
-    const phase=(elapsed%beatDuration)/beatDuration; // 0→1
-    let intensity;
-    if(mode==='breath'){
-      // smooth inhale/exhale sinusoid
-      intensity=(Math.sin(phase*Math.PI*2-Math.PI/2)+1)/2;
-      modeLabel.textContent='breathing';
-    }else{
-      // sharper heart pulse
-      intensity=Math.pow(Math.sin(phase*Math.PI),6);
-      modeLabel.textContent='heartbeat';
+      let intensity;
+      if(mode==='breath'){
+        intensity=(Math.sin(phase*Math.PI*2-Math.PI/2)+1)/2;
+        modeLabel.textContent='breathing';
+      }else{
+        intensity=Math.pow(Math.sin(phase*Math.PI),6);
+        modeLabel.textContent='heartbeat';
+      }
+
+      const scale=1+intensity*0.1;
+      const opacity=0.3+intensity*0.7;
+
+      pulse.setAttribute('transform',`scale(${scale.toFixed(3)})`);
+      pulse.setAttribute('stroke-opacity',opacity.toFixed(3));
+      status.textContent=`${bpm.toFixed(0)} BPM`;
     }
-
-    const scale=1+intensity*0.1;
-    const opacity=0.3+intensity*0.7;
-
-    pulse.setAttribute('transform',`scale(${scale.toFixed(3)})`);
-    pulse.setAttribute('stroke-opacity',opacity.toFixed(3));
-    status.textContent=`${bpm.toFixed(0)} BPM`;
-
     requestAnimationFrame(animate);
   }
 
