@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Infinite Present — Pulse Dial</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600&display=swap');
+  :root{
+    --bg:#000000;
+    --ring-base:#161616;
+    --progress:rgba(255,255,255,0.88);
+    --text:#e8eef5;
+    --muted:#8e8e8e;
+  }
+
+  html,body{
+    margin:0; padding:0;
+    background:var(--bg); color:var(--text);
+    font-family:'Saira',ui-sans-serif,system-ui;
+    overflow:hidden;
+  }
+
+  .wrap{
+    width:100%; display:grid; place-items:center;
+    padding:clamp(12px,2vw,28px);
+  }
+
+  .card{
+    width:100%;
+    max-width:600px;
+    aspect-ratio:1/1;
+    position:relative;
+    background:#000;
+  }
+
+  svg{width:100%;height:100%;display:block;}
+
+  .center-text{
+    position:absolute; inset:0;
+    display:grid; place-items:center;
+    text-align:center;
+  }
+
+  .label{font-size:clamp(14px,2vw,18px);color:var(--muted);margin-top:6px;}
+  .legend{position:absolute;bottom:14px;left:16px;font-size:12px;color:var(--muted);opacity:.9;}
+
+  .controls{
+    text-align:center;
+    margin-top:12px;
+    color:var(--muted);
+  }
+  input,select{
+    background:#111;
+    border:1px solid #333;
+    color:var(--text);
+    font-family:inherit;
+    padding:4px 6px;
+    border-radius:4px;
+    margin:0 4px;
+    width:80px;
+    text-align:center;
+  }
+
+  .high-contrast{
+    --ring-base:#10151a;
+    --progress:#00ff8a;
+    --muted:#ffffff;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="card" aria-label="Pulsing dial representing the present moment">
+      <svg viewBox="-100 -100 200 200" aria-hidden="true">
+        <defs>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Base circle -->
+        <circle cx="0" cy="0" r="70" fill="none" stroke="var(--ring-base)" stroke-width="8" />
+
+        <!-- Pulsing ring -->
+        <circle id="pulse" cx="0" cy="0" r="65" fill="none" stroke="var(--progress)" stroke-width="4" filter="url(#glow)" />
+      </svg>
+
+      <div class="center-text">
+        <div>
+          <div id="status" style="font-size:clamp(16px,3vw,26px);font-weight:500;">∞</div>
+          <div class="label" id="modeLabel">—</div>
+        </div>
+      </div>
+
+      <div class="legend">press <kbd>H</kbd> for high-contrast</div>
+    </div>
+
+    <div class="controls">
+      <label for="bpm">BPM:</label>
+      <input id="bpm" type="number" min="20" max="200" value="60" />
+      <select id="mode">
+        <option value="breath">Breath</option>
+        <option value="heartbeat">Heartbeat</option>
+      </select>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const card=document.getElementById('card');
+  const pulse=document.getElementById('pulse');
+  const status=document.getElementById('status');
+  const modeLabel=document.getElementById('modeLabel');
+  const bpmInput=document.getElementById('bpm');
+  const modeSelect=document.getElementById('mode');
+
+  let bpm=60;
+  let mode='breath';
+  let start=performance.now();
+
+  bpmInput.addEventListener('input',()=>bpm=parseFloat(bpmInput.value)||60);
+  modeSelect.addEventListener('change',()=>mode=modeSelect.value);
+
+  document.addEventListener('keydown',e=>{
+    if(e.key.toLowerCase()==='h')document.body.classList.toggle('high-contrast');
+  });
+
+  function animate(t){
+    const elapsed=(t-start)/1000;
+    const beatDuration=60/bpm;
+
+    const phase=(elapsed%beatDuration)/beatDuration; // 0→1
+    let intensity;
+    if(mode==='breath'){
+      // smooth inhale/exhale sinusoid
+      intensity=(Math.sin(phase*Math.PI*2-Math.PI/2)+1)/2;
+      modeLabel.textContent='breathing';
+    }else{
+      // sharper heart pulse
+      intensity=Math.pow(Math.sin(phase*Math.PI),6);
+      modeLabel.textContent='heartbeat';
+    }
+
+    const scale=1+intensity*0.1;
+    const opacity=0.3+intensity*0.7;
+
+    pulse.setAttribute('transform',`scale(${scale.toFixed(3)})`);
+    pulse.setAttribute('stroke-opacity',opacity.toFixed(3));
+    status.textContent=`${bpm.toFixed(0)} BPM`;
+
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
