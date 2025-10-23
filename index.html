@@ -18,23 +18,32 @@
     margin:0; padding:0;
     background:var(--bg); color:var(--text);
     font-family:'Saira',ui-sans-serif,system-ui;
+    /* allow scrolling in tight embeds */
     overflow:auto;
   }
 
+  /* Layout becomes column-based so we can measure and fit */
   .wrap{
-    width:100%; display:grid; place-items:center;
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
     padding:clamp(12px,2vw,28px);
+    min-height:100vh; /* lets the page scroll if it's still too tight */
+    box-sizing:border-box;
   }
 
   .card{
     width:100%;
     max-width:600px;
-    aspect-ratio:1/1;
+    /* JS will set explicit width/height px to keep controls visible */
     position:relative;
     background:#000;
+    box-sizing:border-box;
   }
 
-  svg{width:100%;height:100%;display:block;}
+  svg{width:100%; height:100%; display:block;}
 
   .center-text{
     position:absolute; inset:0;
@@ -47,9 +56,10 @@
 
   .controls{
     text-align:center;
-    margin-top:12px;
+    margin-top:4px;
     color:var(--muted);
   }
+  .controls label{margin-right:4px;}
   input,select{
     background:#111;
     border:1px solid #333;
@@ -72,6 +82,11 @@
     font-size:clamp(16px,3vw,26px);
     font-weight:500;
     transition:opacity 0.8s ease;
+  }
+
+  /* Prefer a square on roomy screens; JS still caps size when short */
+  @media (min-height: 700px) {
+    .card { aspect-ratio: 1 / 1; }
   }
 </style>
 </head>
@@ -114,6 +129,7 @@
   </div>
 
 <script>
+/* --- Animation & interactions --- */
 (function(){
   const card=document.getElementById('card');
   const pulse=document.getElementById('pulse');
@@ -127,7 +143,7 @@
   let start=performance.now();
   let resting=false;
 
-  bpmInput.addEventListener('input',()=>bpm=parseFloat(bpmInput.value)||60);
+  bpmInput.addEventListener('input',()=>bpm=Math.min(200,Math.max(20,parseFloat(bpmInput.value)||60)));
   modeSelect.addEventListener('change',()=>mode=modeSelect.value);
 
   document.addEventListener('keydown',e=>{
@@ -175,6 +191,44 @@
   }
 
   requestAnimationFrame(animate);
+})();
+
+/* --- Resizer: keeps controls visible in short landscape iframes (e.g., Xeneon Edge) --- */
+(function(){
+  const wrap = document.querySelector('.wrap');
+  const card = document.getElementById('card');
+  const controls = document.querySelector('.controls');
+
+  function fitCard(){
+    // Total vertical space available to the wrap (iframe height in embeds)
+    const wrapH = wrap.clientHeight;
+    const controlsH = controls.offsetHeight;
+    const verticalGaps = 24; // approx padding/gap
+    const availableH = Math.max(120, wrapH - controlsH - verticalGaps);
+
+    // Horizontal space (respecting max-width on card)
+    const wrapW = wrap.clientWidth;
+    const maxW = Math.min(600, wrapW);
+
+    // Choose the largest square that fits both width and available height
+    const size = Math.floor(Math.max(120, Math.min(maxW, availableH)));
+
+    // Apply explicit pixel size so the SVG fills it
+    card.style.width  = size + 'px';
+    card.style.height = size + 'px';
+  }
+
+  // Run on load and on any resize/orientation changes
+  window.addEventListener('load', fitCard);
+  window.addEventListener('resize', fitCard);
+  window.addEventListener('orientationchange', fitCard);
+
+  // Observe size changes (some containers resize without window events)
+  const ro = new ResizeObserver(fitCard);
+  ro.observe(wrap);
+
+  // Initial call
+  fitCard();
 })();
 </script>
 </body>
