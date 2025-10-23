@@ -112,7 +112,7 @@
         </div>
       </div>
 
-      <div class="legend">press <kbd>M</kbd> to cycle modes • <kbd>H</kbd> high-contrast • <kbd>R</kbd> rest</div>
+      <div class="legend">press <kbd>M</kbd> mode • <kbd>H</kbd> high-contrast • <kbd>R</kbd> rest</div>
     </div>
 
     <div class="controls">
@@ -121,8 +121,7 @@
       <label for="mode">Mode:</label>
       <select id="mode">
         <option value="breath">Breath (smooth)</option>
-        <option value="beat1">Heartbeat (single)</option>
-        <option value="beat2">Heartbeat (double)</option>
+        <option value="heartbeat">Heartbeat</option>
       </select>
     </div>
   </div>
@@ -137,7 +136,7 @@
   const modeSelect=document.getElementById('mode');
 
   let bpm=60;
-  let mode=modeSelect.value; // 'breath' | 'beat1' | 'beat2'
+  let mode=modeSelect.value; // 'breath' | 'heartbeat'
   let start=performance.now();
   let resting=false;
 
@@ -155,7 +154,7 @@
   });
 
   function cycleMode(){
-    const order=['breath','beat1','beat2'];
+    const order=['breath','heartbeat'];
     const idx=order.indexOf(mode);
     mode=order[(idx+1)%order.length];
     modeSelect.value=mode;
@@ -164,8 +163,7 @@
 
   function updateModeLabel(){
     if(mode==='breath') modeLabel.textContent='breathing';
-    else if(mode==='beat1') modeLabel.textContent='heartbeat (single)';
-    else modeLabel.textContent='heartbeat (double)';
+    else modeLabel.textContent='heartbeat';
   }
 
   function enterRest(){
@@ -182,7 +180,7 @@
     updateModeLabel();
   }
 
-  // Helper: wrapped distance on [0,1)
+  // Helper: wrapped distance on [0,1) for Gaussian pulses
   function wrapDist(a,b){
     const d=Math.abs(a-b);
     return Math.min(d,1-d);
@@ -198,14 +196,13 @@
       if(mode==='breath'){
         // smooth inhale/exhale cycle
         intensity=(Math.sin(phase*Math.PI*2 - Math.PI/2)+1)/2; // 0..1
-      }else if(mode==='beat1'){
-        // single sharp beat per cycle
-        intensity=Math.pow(Math.sin(phase*Math.PI),6); // peaky
       }else{
-        // double beat ("lub-dub"): two pulses per cycle with different strengths
-        const sigma=0.06; // width of each pulse
-        const p1=Math.exp(-(wrapDist(phase,0.05)**2)/(2*sigma*sigma)); // main beat
-        const p2=Math.exp(-(wrapDist(phase,0.35)**2)/(2*sigma*sigma)); // follow-up
+        // Heartbeat: double flicker ("lub-dub") each beat
+        // First pulse near start, second shortly after, slightly weaker and narrower
+        const sigma1=0.06, sigma2=0.05;    // pulse widths
+        const p1Center=0.05, p2Center=0.35; // timing within the cycle
+        const p1=Math.exp(-(wrapDist(phase,p1Center)**2)/(2*sigma1*sigma1));
+        const p2=Math.exp(-(wrapDist(phase,p2Center)**2)/(2*sigma2*sigma2));
         intensity = Math.min(1, p1*1.0 + p2*0.55);
       }
 
