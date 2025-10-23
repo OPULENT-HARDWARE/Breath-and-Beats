@@ -18,11 +18,9 @@
     margin:0; padding:0;
     background:var(--bg); color:var(--text);
     font-family:'Saira',ui-sans-serif,system-ui;
-    /* allow scrolling in tight embeds */
-    overflow:auto;
+    overflow:auto; /* allow scroll in tight embeds */
   }
 
-  /* Layout becomes column-based so we can measure and fit */
   .wrap{
     width:100%;
     display:flex;
@@ -30,14 +28,13 @@
     align-items:center;
     gap:12px;
     padding:clamp(12px,2vw,28px);
-    min-height:100vh; /* lets the page scroll if it's still too tight */
+    min-height:100vh;
     box-sizing:border-box;
   }
 
   .card{
     width:100%;
     max-width:600px;
-    /* JS will set explicit width/height px to keep controls visible */
     position:relative;
     background:#000;
     box-sizing:border-box;
@@ -68,7 +65,7 @@
     padding:4px 6px;
     border-radius:4px;
     margin:0 4px;
-    width:80px;
+    width:110px;
     text-align:center;
   }
 
@@ -115,15 +112,17 @@
         </div>
       </div>
 
-      <div class="legend">press <kbd>H</kbd> for high-contrast • <kbd>R</kbd> for rest</div>
+      <div class="legend">press <kbd>M</kbd> to cycle modes • <kbd>H</kbd> high-contrast • <kbd>R</kbd> rest</div>
     </div>
 
     <div class="controls">
       <label for="bpm">BPM:</label>
       <input id="bpm" type="number" min="20" max="200" value="60" />
+      <label for="mode">Mode:</label>
       <select id="mode">
-        <option value="breath">Breath</option>
-        <option value="heartbeat">Heartbeat</option>
+        <option value="breath">Breath (smooth)</option>
+        <option value="beat1">Heartbeat (single)</option>
+        <option value="beat2">Heartbeat (double)</option>
       </select>
     </div>
   </div>
@@ -131,7 +130,6 @@
 <script>
 /* --- Animation & interactions --- */
 (function(){
-  const card=document.getElementById('card');
   const pulse=document.getElementById('pulse');
   const status=document.getElementById('status');
   const modeLabel=document.getElementById('modeLabel');
@@ -139,30 +137,55 @@
   const modeSelect=document.getElementById('mode');
 
   let bpm=60;
-  let mode='breath';
+  let mode=modeSelect.value; // 'breath' | 'beat1' | 'beat2'
   let start=performance.now();
   let resting=false;
 
-  bpmInput.addEventListener('input',()=>bpm=Math.min(200,Math.max(20,parseFloat(bpmInput.value)||60)));
-  modeSelect.addEventListener('change',()=>mode=modeSelect.value);
+  bpmInput.addEventListener('input',()=>{
+    bpm=Math.min(200,Math.max(20,parseFloat(bpmInput.value)||60));
+  });
+  modeSelect.addEventListener('change',()=>{ mode=modeSelect.value; updateModeLabel(); });
 
+  // Keyboard shortcuts
   document.addEventListener('keydown',e=>{
     const k=e.key.toLowerCase();
     if(k==='h') document.body.classList.toggle('high-contrast');
     if(k==='r'){ resting=!resting; if(resting){ enterRest(); } else { exitRest(); } }
+    if(k==='m'){ cycleMode(); }
   });
+
+  function cycleMode(){
+    const order=['breath','beat1','beat2'];
+    const idx=order.indexOf(mode);
+    mode=order[(idx+1)%order.length];
+    modeSelect.value=mode;
+    updateModeLabel();
+  }
+
+  function updateModeLabel(){
+    if(mode==='breath') modeLabel.textContent='breathing';
+    else if(mode==='beat1') modeLabel.textContent='heartbeat (single)';
+    else modeLabel.textContent='heartbeat (double)';
+  }
 
   function enterRest(){
     resting=true;
     pulse.setAttribute('transform','scale(1)');
     pulse.setAttribute('stroke-opacity','0.3');
-    modeLabel.textContent='stillness';
     status.style.opacity=0; // fade out BPM
+    modeLabel.textContent='stillness';
   }
 
   function exitRest(){
     resting=false;
     status.style.opacity=1;
+    updateModeLabel();
+  }
+
+  // Helper: wrapped distance on [0,1)
+  function wrapDist(a,b){
+    const d=Math.abs(a-b);
+    return Math.min(d,1-d);
   }
 
   function animate(t){
@@ -173,15 +196,21 @@
 
       let intensity;
       if(mode==='breath'){
-        intensity=(Math.sin(phase*Math.PI*2-Math.PI/2)+1)/2;
-        modeLabel.textContent='breathing';
+        // smooth inhale/exhale cycle
+        intensity=(Math.sin(phase*Math.PI*2 - Math.PI/2)+1)/2; // 0..1
+      }else if(mode==='beat1'){
+        // single sharp beat per cycle
+        intensity=Math.pow(Math.sin(phase*Math.PI),6); // peaky
       }else{
-        intensity=Math.pow(Math.sin(phase*Math.PI),6);
-        modeLabel.textContent='heartbeat';
+        // double beat ("lub-dub"): two pulses per cycle with different strengths
+        const sigma=0.06; // width of each pulse
+        const p1=Math.exp(-(wrapDist(phase,0.05)**2)/(2*sigma*sigma)); // main beat
+        const p2=Math.exp(-(wrapDist(phase,0.35)**2)/(2*sigma*sigma)); // follow-up
+        intensity = Math.min(1, p1*1.0 + p2*0.55);
       }
 
-      const scale=1+intensity*0.1;
-      const opacity=0.3+intensity*0.7;
+      const scale=1 + intensity*0.1;
+      const opacity=0.3 + intensity*0.7;
 
       pulse.setAttribute('transform',`scale(${scale.toFixed(3)})`);
       pulse.setAttribute('stroke-opacity',opacity.toFixed(3));
@@ -190,6 +219,7 @@
     requestAnimationFrame(animate);
   }
 
+  updateModeLabel();
   requestAnimationFrame(animate);
 })();
 
