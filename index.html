@@ -18,7 +18,7 @@
     margin:0; padding:0;
     background:var(--bg); color:var(--text);
     font-family:'Saira',ui-sans-serif,system-ui;
-    overflow:auto; /* allow scroll in tight embeds */
+    overflow:auto;
   }
 
   .wrap{
@@ -81,7 +81,6 @@
     transition:opacity 0.8s ease;
   }
 
-  /* Prefer a square on roomy screens; JS still caps size when short */
   @media (min-height: 700px) {
     .card { aspect-ratio: 1 / 1; }
   }
@@ -98,10 +97,7 @@
           </filter>
         </defs>
 
-        <!-- Base circle -->
         <circle cx="0" cy="0" r="74" fill="none" stroke="var(--ring-base)" stroke-width="8" />
-
-        <!-- Pulsing ring -->
         <circle id="pulse" cx="0" cy="0" r="74" fill="none" stroke="var(--progress)" stroke-width="4" filter="url(#glow)" />
       </svg>
 
@@ -127,7 +123,6 @@
   </div>
 
 <script>
-/* --- Animation & interactions --- */
 (function(){
   const pulse=document.getElementById('pulse');
   const status=document.getElementById('status');
@@ -136,7 +131,7 @@
   const modeSelect=document.getElementById('mode');
 
   let bpm=60;
-  let mode=modeSelect.value; // 'breath' | 'heartbeat'
+  let mode=modeSelect.value;
   let start=performance.now();
   let resting=false;
 
@@ -145,7 +140,6 @@
   });
   modeSelect.addEventListener('change',()=>{ mode=modeSelect.value; updateModeLabel(); });
 
-  // Keyboard shortcuts
   document.addEventListener('keydown',e=>{
     const k=e.key.toLowerCase();
     if(k==='h') document.body.classList.toggle('high-contrast');
@@ -170,7 +164,7 @@
     resting=true;
     pulse.setAttribute('transform','scale(1)');
     pulse.setAttribute('stroke-opacity','0.3');
-    status.style.opacity=0; // fade out BPM
+    status.style.opacity=0;
     modeLabel.textContent='stillness';
   }
 
@@ -180,7 +174,6 @@
     updateModeLabel();
   }
 
-  // Helper: wrapped distance on [0,1) for Gaussian pulses
   function wrapDist(a,b){
     const d=Math.abs(a-b);
     return Math.min(d,1-d);
@@ -189,21 +182,21 @@
   function animate(t){
     if(!resting){
       const elapsed=(t-start)/1000;
-      const beatDuration=60/bpm;
-      const phase=(elapsed%beatDuration)/beatDuration; // 0→1
+
+      // ✅ FIX: double the beat duration for heartbeat mode
+      const beatDuration = (mode === 'heartbeat') ? 120 / bpm : 60 / bpm;
+
+      const phase=(elapsed%beatDuration)/beatDuration;
 
       let intensity;
       if(mode==='breath'){
-        // smooth inhale/exhale cycle
-        intensity=(Math.sin(phase*Math.PI*2 - Math.PI/2)+1)/2; // 0..1
+        intensity=(Math.sin(phase*Math.PI*2 - Math.PI/2)+1)/2;
       }else{
-        // Heartbeat: double flicker ("lub-dub") each beat
-        // First pulse near start, second shortly after, slightly weaker and narrower
-        const sigma1=0.06, sigma2=0.05;    // pulse widths
-        const p1Center=0.05, p2Center=0.35; // timing within the cycle
+        const sigma1=0.06, sigma2=0.05;
+        const p1Center=0.05, p2Center=0.35;
         const p1=Math.exp(-(wrapDist(phase,p1Center)**2)/(2*sigma1*sigma1));
         const p2=Math.exp(-(wrapDist(phase,p2Center)**2)/(2*sigma2*sigma2));
-        intensity = Math.min(1, p1*1.0 + p2*0.55);
+        intensity=Math.min(1, p1*1.0 + p2*0.55);
       }
 
       const scale=1 + intensity*0.1;
@@ -220,41 +213,31 @@
   requestAnimationFrame(animate);
 })();
 
-/* --- Resizer: keeps controls visible in short landscape iframes (e.g., Xeneon Edge) --- */
 (function(){
   const wrap = document.querySelector('.wrap');
   const card = document.getElementById('card');
   const controls = document.querySelector('.controls');
 
   function fitCard(){
-    // Total vertical space available to the wrap (iframe height in embeds)
     const wrapH = wrap.clientHeight;
     const controlsH = controls.offsetHeight;
-    const verticalGaps = 24; // approx padding/gap
+    const verticalGaps = 24;
     const availableH = Math.max(120, wrapH - controlsH - verticalGaps);
 
-    // Horizontal space (respecting max-width on card)
     const wrapW = wrap.clientWidth;
     const maxW = Math.min(600, wrapW);
-
-    // Choose the largest square that fits both width and available height
     const size = Math.floor(Math.max(120, Math.min(maxW, availableH)));
 
-    // Apply explicit pixel size so the SVG fills it
     card.style.width  = size + 'px';
     card.style.height = size + 'px';
   }
 
-  // Run on load and on any resize/orientation changes
   window.addEventListener('load', fitCard);
   window.addEventListener('resize', fitCard);
   window.addEventListener('orientationchange', fitCard);
 
-  // Observe size changes (some containers resize without window events)
   const ro = new ResizeObserver(fitCard);
   ro.observe(wrap);
-
-  // Initial call
   fitCard();
 })();
 </script>
